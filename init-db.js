@@ -9,6 +9,8 @@ async function init() {
   const client = await pool.connect();
   try {
     await client.query(`
+      CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
       CREATE TABLE IF NOT EXISTS departments (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         name TEXT NOT NULL UNIQUE
