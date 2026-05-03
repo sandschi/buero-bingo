@@ -27,7 +27,6 @@ export default function VotePage() {
 
   const getUserId = () => {
     let id = localStorage.getItem('bingo_user_id');
-    // Validate it's a proper UUID (36 chars with dashes); regenerate if not
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!id || !uuidRegex.test(id)) {
       id = crypto.randomUUID();
@@ -42,7 +41,8 @@ export default function VotePage() {
       fetch(`/api/entries?userId=${userId}`),
       fetch('/api/departments'),
     ]);
-    setEntries(await entriesRes.json());
+    const entriesData = await entriesRes.json();
+    setEntries(Array.isArray(entriesData) ? entriesData : []);
     setDepartments(await deptsRes.json());
     setLoading(false);
   }, []);
@@ -51,45 +51,85 @@ export default function VotePage() {
 
   const handleDeptVote = async (entryId: string, departmentId: string) => {
     const userId = getUserId();
-    const res = await fetch('/api/vote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entryId, userId, type: 'dept', departmentId }),
-    });
-    if (res.ok) {
-      // Optimistic update
-      setEntries(prev => prev.map(e => {
-        if (e.id !== entryId) return e;
-        return {
+    const entry = entries.find(e => e.id === entryId);
+    if (!entry) return;
+
+    const alreadyVoted = entry.userDeptVotes.includes(departmentId);
+
+    if (alreadyVoted) {
+      // Remove vote
+      const res = await fetch('/api/vote', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryId, userId, type: 'dept', departmentId }),
+      });
+      if (res.ok) {
+        setEntries(prev => prev.map(e => e.id !== entryId ? e : {
+          ...e,
+          userDeptVotes: e.userDeptVotes.filter(id => id !== departmentId),
+          deptVotes: { ...e.deptVotes, [departmentId]: Math.max(0, (e.deptVotes[departmentId] || 1) - 1) },
+        }));
+      }
+    } else {
+      // Cannot dept-vote if downvoted
+      if (entry.userDownvoted) return;
+
+      const res = await fetch('/api/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryId, userId, type: 'dept', departmentId }),
+      });
+      if (res.ok) {
+        setEntries(prev => prev.map(e => e.id !== entryId ? e : {
           ...e,
           userDeptVotes: [...e.userDeptVotes, departmentId],
-          deptVotes: {
-            ...e.deptVotes,
-            [departmentId]: (e.deptVotes[departmentId] || 0) + 1,
-          },
-        };
-      }));
+          deptVotes: { ...e.deptVotes, [departmentId]: (e.deptVotes[departmentId] || 0) + 1 },
+        }));
+      }
     }
   };
 
   const handleDownvote = async (entryId: string) => {
     const userId = getUserId();
-    const res = await fetch('/api/vote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entryId, userId, type: 'down' }),
-    });
-    if (res.ok) {
-      setEntries(prev => prev.map(e =>
-        e.id === entryId ? { ...e, userDownvoted: true, downvotes: e.downvotes + 1 } : e
-      ));
+    const entry = entries.find(e => e.id === entryId);
+    if (!entry) return;
+
+    if (entry.userDownvoted) {
+      // Remove downvote
+      const res = await fetch('/api/vote', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryId, userId, type: 'down' }),
+      });
+      if (res.ok) {
+        setEntries(prev => prev.map(e => e.id !== entryId ? e : {
+          ...e,
+          userDownvoted: false,
+          downvotes: Math.max(0, e.downvotes - 1),
+        }));
+      }
+    } else {
+      // Cannot downvote if already dept-voted
+      if (entry.userDeptVotes.length > 0) return;
+
+      const res = await fetch('/api/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryId, userId, type: 'down' }),
+      });
+      if (res.ok) {
+        setEntries(prev => prev.map(e => e.id !== entryId ? e : {
+          ...e,
+          userDownvoted: true,
+          downvotes: e.downvotes + 1,
+        }));
+      }
     }
   };
 
   const filteredEntries = selectedDept === 'all'
     ? entries
     : entries.filter(e =>
-        // Show entries that have any dept votes for this dept OR no dept-specific votes yet
         Object.keys(e.deptVotes).includes(selectedDept) || Object.keys(e.deptVotes).length === 0
       );
 
@@ -100,6 +140,8 @@ export default function VotePage() {
       <h1 style={{ marginBottom: '0.5rem' }}>Abstimmen</h1>
       <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
         Stimme ab, für welche Abteilung ein Spruch relevant ist — oder lehne ihn ab.
+        <br />
+        <span style={{ fontSize: '0.8rem' }}>Du kannst für mehrere Abteilungen voten, aber nicht gleichzeitig ablehnen.</span>
       </p>
 
       {/* Department filter */}
@@ -129,88 +171,96 @@ export default function VotePage() {
             <p>Keine Vorschläge zum Abstimmen.</p>
           </div>
         ) : (
-          filteredEntries.map(entry => (
-            <div key={entry.id} className="card">
-              {/* Header row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                  <p style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.3rem' }}>"{entry.text}"</p>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Von: {entry.author_name}</span>
-                </div>
-                <button
-                  onClick={() => !entry.userDownvoted && handleDownvote(entry.id)}
-                  disabled={entry.userDownvoted}
-                  title="Ablehnen"
-                  style={{
-                    background: entry.userDownvoted ? '#ef4444' : 'transparent',
-                    border: `1px solid ${entry.userDownvoted ? '#ef4444' : 'var(--border)'}`,
-                    color: entry.userDownvoted ? '#fff' : '#ef4444',
-                    borderRadius: '8px',
-                    padding: '0.4rem 0.7rem',
-                    cursor: entry.userDownvoted ? 'default' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.4rem',
-                    fontSize: '0.8rem',
-                    whiteSpace: 'nowrap',
-                    flexShrink: 0,
-                    transition: 'var(--transition)',
-                  }}
-                >
-                  <ThumbsDown size={15} />
-                  {entry.downvotes > 0 && <span>{entry.downvotes}</span>}
-                </button>
-              </div>
+          filteredEntries.map(entry => {
+            const hasDeptVotes = entry.userDeptVotes.length > 0;
+            return (
+              <div key={entry.id} className="card">
+                {/* Header row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
+                  <div>
+                    <p style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.3rem' }}>"{entry.text}"</p>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Von: {entry.author_name}</span>
+                  </div>
 
-              {/* Department vote buttons */}
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.8rem' }}>
-                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.6rem' }}>
-                  Relevant für:
-                </p>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {departments.map(dept => {
-                    const voted = entry.userDeptVotes.includes(dept.id);
-                    const count = entry.deptVotes[dept.id] || 0;
-                    return (
-                      <button
-                        key={dept.id}
-                        onClick={() => !voted && handleDeptVote(entry.id, dept.id)}
-                        disabled={voted || entry.userDownvoted}
-                        style={{
-                          background: voted ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
-                          border: `1px solid ${voted ? 'var(--accent)' : 'var(--border)'}`,
-                          color: voted ? '#fff' : 'var(--text-secondary)',
-                          borderRadius: '20px',
-                          padding: '0.3rem 0.8rem',
-                          fontSize: '0.8rem',
-                          cursor: (voted || entry.userDownvoted) ? 'default' : 'pointer',
-                          transition: 'var(--transition)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.4rem',
-                          opacity: entry.userDownvoted && !voted ? 0.4 : 1,
-                        }}
-                      >
-                        {dept.name}
-                        {count > 0 && (
-                          <span style={{
-                            background: voted ? 'rgba(255,255,255,0.25)' : 'var(--accent)',
-                            color: '#fff',
-                            borderRadius: '10px',
-                            padding: '0 0.4rem',
-                            fontSize: '0.7rem',
-                            fontWeight: '700',
-                          }}>
-                            {count}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
+                  {/* Downvote button */}
+                  <button
+                    onClick={() => handleDownvote(entry.id)}
+                    disabled={hasDeptVotes && !entry.userDownvoted}
+                    title={hasDeptVotes ? 'Nicht möglich: du hast bereits für Abteilungen gevotet' : entry.userDownvoted ? 'Ablehnung zurückziehen' : 'Ablehnen'}
+                    style={{
+                      background: entry.userDownvoted ? '#ef4444' : 'transparent',
+                      border: `1px solid ${entry.userDownvoted ? '#ef4444' : 'var(--border)'}`,
+                      color: entry.userDownvoted ? '#fff' : '#ef4444',
+                      borderRadius: '8px',
+                      padding: '0.4rem 0.7rem',
+                      cursor: (hasDeptVotes && !entry.userDownvoted) ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      fontSize: '0.8rem',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                      opacity: (hasDeptVotes && !entry.userDownvoted) ? 0.35 : 1,
+                      transition: 'var(--transition)',
+                    }}
+                  >
+                    <ThumbsDown size={15} />
+                    {entry.downvotes > 0 && <span>{entry.downvotes}</span>}
+                  </button>
+                </div>
+
+                {/* Department vote buttons */}
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.8rem' }}>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.6rem' }}>
+                    Relevant für:
+                    {entry.userDownvoted && <span style={{ color: '#ef4444', marginLeft: '0.5rem' }}>(abgelehnt — keine weiteren Votes möglich)</span>}
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {departments.map(dept => {
+                      const voted = entry.userDeptVotes.includes(dept.id);
+                      const count = entry.deptVotes[dept.id] || 0;
+                      const blocked = entry.userDownvoted && !voted;
+                      return (
+                        <button
+                          key={dept.id}
+                          onClick={() => !blocked && handleDeptVote(entry.id, dept.id)}
+                          disabled={blocked}
+                          style={{
+                            background: voted ? 'var(--accent)' : 'rgba(255,255,255,0.05)',
+                            border: `1px solid ${voted ? 'var(--accent)' : 'var(--border)'}`,
+                            color: voted ? '#fff' : 'var(--text-secondary)',
+                            borderRadius: '20px',
+                            padding: '0.3rem 0.8rem',
+                            fontSize: '0.8rem',
+                            cursor: blocked ? 'not-allowed' : 'pointer',
+                            opacity: blocked ? 0.35 : 1,
+                            transition: 'var(--transition)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                          }}
+                        >
+                          {dept.name}
+                          {count > 0 && (
+                            <span style={{
+                              background: voted ? 'rgba(255,255,255,0.25)' : 'var(--accent)',
+                              color: '#fff',
+                              borderRadius: '10px',
+                              padding: '0 0.4rem',
+                              fontSize: '0.7rem',
+                              fontWeight: '700',
+                            }}>
+                              {count}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

@@ -22,24 +22,30 @@ export async function POST(request: Request) {
       await query('DELETE FROM bingo_entries WHERE id = $1', [entryId]);
 
     } else if (action === 'get_all') {
-      const { rows } = await query(`
+      const { rows: entries } = await query(`
         SELECT e.*,
-               COALESCE(SUM(CASE WHEN v.type = 'up' THEN 1 ELSE 0 END), 0)::int as upvotes,
-               COALESCE(SUM(CASE WHEN v.type = 'down' THEN 1 ELSE 0 END), 0)::int as downvotes,
-               COALESCE(
-                 json_agg(
-                   CASE WHEN v.type = 'dept' AND v.department_id IS NOT NULL
-                   THEN json_build_object('dept_id', v.department_id, 'count', 1)
-                   END
-                 ) FILTER (WHERE v.type = 'dept'),
-                 '[]'
-               ) as dept_votes_raw
+               COALESCE(SUM(CASE WHEN v.type = 'down' THEN 1 ELSE 0 END), 0)::int as downvotes
         FROM bingo_entries e
         LEFT JOIN votes v ON e.id = v.entry_id
         GROUP BY e.id
         ORDER BY e.created_at DESC
       `);
-      return NextResponse.json(rows);
+
+      const { rows: deptVoteRows } = await query(`
+        SELECT v.entry_id, d.id as dept_id, d.name as dept_name, COUNT(*)::int as count
+        FROM votes v
+        JOIN departments d ON v.department_id = d.id
+        WHERE v.type = 'dept'
+        GROUP BY v.entry_id, d.id, d.name
+      `);
+
+      const deptVoteMap: Record<string, { dept_id: string; dept_name: string; count: number }[]> = {};
+      for (const r of deptVoteRows) {
+        if (!deptVoteMap[r.entry_id]) deptVoteMap[r.entry_id] = [];
+        deptVoteMap[r.entry_id].push({ dept_id: r.dept_id, dept_name: r.dept_name, count: r.count });
+      }
+
+      return NextResponse.json(entries.map((e: any) => ({ ...e, dept_vote_counts: deptVoteMap[e.id] || [] })));
 
     } else if (action === 'get_settings') {
       const { rows } = await query('SELECT key, value FROM settings');

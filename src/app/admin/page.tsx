@@ -8,9 +8,9 @@ interface Entry {
   text: string;
   status: string;
   author_name: string;
-  upvotes: number;
   downvotes: number;
   department_ids: string[];
+  dept_vote_counts: { dept_id: string; dept_name: string; count: number }[];
 }
 
 interface Department {
@@ -193,9 +193,21 @@ export default function AdminPage() {
                         {(entry.department_ids || []).length === 0 && <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>–</span>}
                       </div>
                     </td>
-                    <td style={{ padding: '1rem', whiteSpace: 'nowrap' }}>
-                      <span style={{ color: 'var(--success)' }}>↑{entry.upvotes || 0}</span>{' '}
-                      <span style={{ color: '#ef4444' }}>↓{entry.downvotes || 0}</span>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                        {(entry.dept_vote_counts || []).map(dv => (
+                          <span key={dv.dept_id} style={{ fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                            <span style={{ color: 'var(--accent)', fontWeight: '600' }}>{dv.count}×</span>{' '}
+                            <span style={{ color: 'var(--text-secondary)' }}>{dv.dept_name}</span>
+                          </span>
+                        ))}
+                        {(entry.downvotes || 0) > 0 && (
+                          <span style={{ fontSize: '0.75rem', color: '#ef4444', whiteSpace: 'nowrap' }}>↓ {entry.downvotes} Ablehnung{entry.downvotes !== 1 ? 'en' : ''}</span>
+                        )}
+                        {(!entry.dept_vote_counts?.length && !entry.downvotes) && (
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>–</span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '1rem' }}>
                       <span style={{
