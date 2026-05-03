@@ -1,0 +1,43 @@
+{
+  "app": {
+    "title": "Büro-Bingo",
+    "description": "Das vernetzte Bingo-Erlebnis für den Arbeitsplatz."
+  },
+  "menu": {
+    "play": "Spielen",
+    "suggest": "Vorschlagen",
+    "vote": "Abstimmen",
+    "settings": "Einstellungen",
+    "admin": "Admin"
+  },
+  "landing": {
+    "welcome": "Willkommen beim Büro-Bingo!",
+    "rules": "Die Regeln sind einfach:",
+    "rule1": "Wähle deine Abteilung in den Einstellungen.",
+    "rule2": "Klicke auf Felder, die während der Arbeit passieren.",
+    "rule3": "5 in einer Reihe (horizontal, vertikal oder diagonal) ergeben ein BINGO!",
+    "rule4": "Alle Mitspieler werden über dein Bingo benachrichtigt.",
+    "start": "Jetzt Starten"
+  },
+  "play": {
+    "status": "Dein Board",
+    "bingo_alert": "BINGO! {name} aus der Abteilung {department} hat gewonnen!"
+  },
+  "suggest": {
+    "title": "Neuen Spruch vorschlagen",
+    "label_text": "Was ist passiert?",
+    "label_departments": "Für welche Abteilungen?",
+    "submit": "Vorschlag senden",
+    "success": "Vielen Dank! Dein Vorschlag wurde eingereicht."
+  },
+  "vote": {
+    "title": "Stimme über neue Vorschläge ab",
+    "no_suggestions": "Momentan gibt es keine neuen Vorschläge."
+  },
+  "settings": {
+    "title": "Deine Einstellungen",
+    "label_name": "Dein Name",
+    "label_department": "Deine Abteilung",
+    "save": "Speichern"
+  }
+}
