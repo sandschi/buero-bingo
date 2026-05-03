@@ -51,4 +51,10 @@ async function init() {
   }
 }
 
-init();
+init().then(() => {
+  console.log('Script execution finished.');
+  process.exit(0);
+}).catch(err => {
+  console.error('Fatal error during initialization:', err);
+  process.exit(1);
+});
