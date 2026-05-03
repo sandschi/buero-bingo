@@ -6,16 +6,16 @@ export async function GET(request: Request) {
   const deptId = searchParams.get('deptId');
 
   try {
-    // Get entries that are approved AND (either for all departments {} OR match the deptId)
-    let sql = 'SELECT * FROM bingo_entries WHERE status = $1';
-    let params = ['approved'];
+    // Get approved entries that include the requested department in their department_ids
+    let sql: string;
+    let params: string[];
 
     if (deptId) {
-      sql += ' AND (department_ids = $2 OR $3 = ANY(department_ids))';
-      params.push('{}', deptId);
+      sql = "SELECT * FROM bingo_entries WHERE status = 'approved' AND $1::uuid = ANY(department_ids)";
+      params = [deptId];
     } else {
-      sql += ' AND department_ids = $2';
-      params.push('{}');
+      sql = "SELECT * FROM bingo_entries WHERE status = 'approved'";
+      params = [];
     }
 
     const { rows } = await query(sql, params);

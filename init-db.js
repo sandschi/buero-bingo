@@ -38,7 +38,32 @@ async function init() {
         value JSONB NOT NULL
       );
     `);
-    
+
+    // Migrate votes table: add department_id column if not exists
+    await client.query('ALTER TABLE votes ADD COLUMN IF NOT EXISTS department_id UUID');
+
+    // Drop old unique constraint if it exists (was entry_id + user_id)
+    await client.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'votes_entry_id_user_id_key'
+        ) THEN
+          ALTER TABLE votes DROP CONSTRAINT votes_entry_id_user_id_key;
+        END IF;
+      END$$;
+    `);
+
+    // Partial unique indexes for the new voting model
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS votes_dept_unique
+        ON votes (entry_id, user_id, department_id) WHERE type = 'dept'
+    `);
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS votes_down_unique
+        ON votes (entry_id, user_id) WHERE type = 'down'
+    `);
+
     // Seed default settings
     const settingsRes = await client.query("SELECT 1 FROM settings WHERE key = 'auto_approve_threshold'");
     if (settingsRes.rowCount === 0) {
