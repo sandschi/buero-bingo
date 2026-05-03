@@ -14,7 +14,15 @@ export async function POST(request: Request) {
     } else if (action === 'delete') {
       await query('DELETE FROM bingo_entries WHERE id = $1', [entryId]);
     } else if (action === 'get_all') {
-      const { rows } = await query('SELECT * FROM bingo_entries ORDER BY created_at DESC');
+      const { rows } = await query(`
+        SELECT e.*, 
+               COALESCE(SUM(CASE WHEN v.type = 'up' THEN 1 ELSE 0 END), 0)::int as upvotes,
+               COALESCE(SUM(CASE WHEN v.type = 'down' THEN 1 ELSE 0 END), 0)::int as downvotes
+        FROM bingo_entries e
+        LEFT JOIN votes v ON e.id = v.entry_id
+        GROUP BY e.id
+        ORDER BY e.created_at DESC
+      `);
       return NextResponse.json(rows);
     } else if (action === 'get_settings') {
       const { rows } = await query('SELECT key, value FROM settings');

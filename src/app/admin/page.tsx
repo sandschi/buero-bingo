@@ -8,6 +8,8 @@ interface Entry {
   text: string;
   status: string;
   author_name: string;
+  upvotes: number;
+  downvotes: number;
 }
 
 interface Department {
@@ -184,6 +186,7 @@ export default function AdminPage() {
               <tr>
                 <th style={{ padding: '1rem' }}>Text</th>
                 <th style={{ padding: '1rem' }}>Autor</th>
+                <th style={{ padding: '1rem' }}>Votes</th>
                 <th style={{ padding: '1rem' }}>Status</th>
                 <th style={{ padding: '1rem' }}>Aktionen</th>
               </tr>
@@ -193,6 +196,10 @@ export default function AdminPage() {
                 <tr key={entry.id} style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '1rem' }}>{entry.text}</td>
                   <td style={{ padding: '1rem', color: 'var(--text-secondary)' }}>{entry.author_name}</td>
+                  <td style={{ padding: '1rem' }}>
+                    <span style={{ color: 'var(--success)', marginRight: '0.5rem' }}>+{entry.upvotes || 0}</span>
+                    <span style={{ color: 'red' }}>-{entry.downvotes || 0}</span>
+                  </td>
                   <td style={{ padding: '1rem' }}>
                     <span style={{ 
                       padding: '0.2rem 0.6rem', 
