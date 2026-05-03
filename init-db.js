@@ -33,8 +33,17 @@ async function init() {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(entry_id, user_id)
       );
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value JSONB NOT NULL
+      );
     `);
     
+    // Seed default settings
+    const settingsRes = await client.query("SELECT 1 FROM settings WHERE key = 'auto_approve_threshold'");
+    if (settingsRes.rowCount === 0) {
+      await client.query("INSERT INTO settings (key, value) VALUES ('auto_approve_threshold', '5')");
+    }
     const res = await client.query('SELECT 1 FROM departments LIMIT 1');
     if (res.rowCount === 0) {
       await client.query(`

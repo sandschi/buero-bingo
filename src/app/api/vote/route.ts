@@ -19,10 +19,13 @@ export async function POST(request: Request) {
     const { rows: voteCountRows } = await query('SELECT COUNT(*) as count FROM votes WHERE entry_id = $1', [entryId]);
     const votes = parseInt(voteCountRows[0].count);
 
-    // Auto-approval logic (e.g., threshold of 5 for testing)
-    const threshold = 5; 
+    // Fetch threshold from settings
+    const { rows: settingsRows } = await query("SELECT value FROM settings WHERE key = 'auto_approve_threshold'");
+    const threshold = settingsRows.length > 0 ? parseInt(settingsRows[0].value) : 5;
+
+    // Auto-approval logic
     if (votes >= threshold) {
-      await query('UPDATE bingo_entries SET status = $1, is_approved = $2 WHERE id = $3', ['approved', true, entryId]);
+      await query('UPDATE bingo_entries SET status = $1 WHERE id = $2', ['approved', entryId]);
     }
 
     return NextResponse.json({ success: true, votes });

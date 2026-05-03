@@ -16,6 +16,8 @@ export default function AdminPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [error, setError] = useState('');
 
+  const [threshold, setThreshold] = useState<string>('5');
+
   const handleLogin = async () => {
     try {
       const res = await fetch('/api/admin', {
@@ -24,9 +26,20 @@ export default function AdminPage() {
         body: JSON.stringify({ password, action: 'get_all' })
       });
 
-      if (res.ok) {
+      const settingsRes = await fetch('/api/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, action: 'get_settings' })
+      });
+
+      if (res.ok && settingsRes.ok) {
         const data = await res.json();
+        const settingsData = await settingsRes.json();
         setEntries(data);
+        
+        const autoApprove = settingsData.find((s: any) => s.key === 'auto_approve_threshold');
+        if (autoApprove) setThreshold(autoApprove.value);
+
         setIsAuthorized(true);
         setError('');
       } else {
@@ -43,8 +56,12 @@ export default function AdminPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password, action: 'update_status', entryId, status })
     });
-    // Refresh list
-    handleLogin();
+    const res = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password, action: 'get_all' })
+    });
+    if (res.ok) setEntries(await res.json());
   };
 
   const deleteEntry = async (entryId: string) => {
@@ -54,7 +71,21 @@ export default function AdminPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password, action: 'delete', entryId })
     });
-    handleLogin();
+    const res = await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password, action: 'get_all' })
+    });
+    if (res.ok) setEntries(await res.json());
+  };
+
+  const updateThreshold = async () => {
+    await fetch('/api/admin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password, action: 'update_settings', settingsKey: 'auto_approve_threshold', settingsValue: threshold })
+    });
+    alert('Einstellungen gespeichert');
   };
 
   if (!isAuthorized) {
@@ -83,6 +114,15 @@ export default function AdminPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2rem' }}>
         <h1>Admin Dashboard</h1>
         <button className="btn" onClick={() => setIsAuthorized(false)} style={{ background: 'var(--bg-card)' }}>Logout</button>
+      </div>
+
+      <div className="card" style={{ marginBottom: '2rem' }}>
+        <h2 style={{ marginBottom: '1rem' }}>Einstellungen</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <label>Automatisches Freigeben ab x Votes:</label>
+          <input type="number" min="1" value={threshold} onChange={(e) => setThreshold(e.target.value)} style={{ width: '80px', marginBottom: 0 }} />
+          <button className="btn" onClick={updateThreshold}>Speichern</button>
+        </div>
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>

@@ -32,9 +32,18 @@ export const initDb = async () => {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(entry_id, user_id)
       );
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value JSONB NOT NULL
+      );
     `);
     
-    // Seed default departments if none exist
+    // Seed default settings
+    const settingsRes = await query("SELECT 1 FROM settings WHERE key = 'auto_approve_threshold'");
+    if (settingsRes.rowCount === 0) {
+      await query("INSERT INTO settings (key, value) VALUES ('auto_approve_threshold', '5')");
+    }
+
     const { rowCount } = await query('SELECT 1 FROM departments LIMIT 1');
     if (rowCount === 0) {
       await query(`
