@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
 export async function POST(request: Request) {
-  const { password, action, entryId, status, settingsKey, settingsValue } = await request.json();
+  const { password, action, entryId, status, settingsKey, settingsValue, departmentName, departmentId } = await request.json();
 
   if (password !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -21,6 +21,13 @@ export async function POST(request: Request) {
       return NextResponse.json(rows);
     } else if (action === 'update_settings') {
       await query('INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value', [settingsKey, JSON.stringify(settingsValue)]);
+    } else if (action === 'get_departments') {
+      const { rows } = await query('SELECT * FROM departments ORDER BY name ASC');
+      return NextResponse.json(rows);
+    } else if (action === 'add_department') {
+      await query('INSERT INTO departments (name) VALUES ($1)', [departmentName]);
+    } else if (action === 'delete_department') {
+      await query('DELETE FROM departments WHERE id = $1', [departmentId]);
     }
     return NextResponse.json({ success: true });
   } catch (error) {
