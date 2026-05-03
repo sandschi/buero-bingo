@@ -1,23 +1,33 @@
-# Build Stage
-FROM node:20-alpine AS builder
+FROM node:20-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
 
-# Production Stage
-FROM node:20-alpine AS runner
+# Production image, copy all the files and run next
+FROM base AS runner
 WORKDIR /app
-ENV NODE_ENV=production
-ENV HOSTNAME="0.0.0.0"
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/.next ./.next
+
+ENV NODE_ENV production
+ENV HOSTNAME "0.0.0.0"
+ENV PORT 3000
+
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/src ./src
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/server.js ./server.js
 COPY --from=builder /app/init-db.js ./init-db.js
 
 EXPOSE 3000
+
 CMD ["sh", "-c", "node init-db.js && node server.js"]
