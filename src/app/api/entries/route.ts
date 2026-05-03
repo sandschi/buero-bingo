@@ -22,14 +22,19 @@ export async function GET(request: Request) {
       "SELECT entry_id, COUNT(*) as count FROM votes WHERE type = 'down' GROUP BY entry_id"
     );
 
-    // User's votes
+    // User's votes (only query if userId looks like a valid UUID)
     let userVotes: { entry_id: string; department_id: string | null; type: string }[] = [];
-    if (userId) {
-      const { rows } = await query(
-        'SELECT entry_id, department_id, type FROM votes WHERE user_id = $1',
-        [userId]
-      );
-      userVotes = rows;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (userId && uuidRegex.test(userId)) {
+      try {
+        const { rows } = await query(
+          'SELECT entry_id, department_id, type FROM votes WHERE user_id = $1',
+          [userId]
+        );
+        userVotes = rows;
+      } catch {
+        // Invalid userId format — skip user vote state
+      }
     }
 
     // Build vote maps

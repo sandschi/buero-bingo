@@ -27,8 +27,10 @@ export default function VotePage() {
 
   const getUserId = () => {
     let id = localStorage.getItem('bingo_user_id');
-    if (!id) {
-      id = Math.random().toString(36).substring(2, 10);
+    // Validate it's a proper UUID (36 chars with dashes); regenerate if not
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!id || !uuidRegex.test(id)) {
+      id = crypto.randomUUID();
       localStorage.setItem('bingo_user_id', id);
     }
     return id;
