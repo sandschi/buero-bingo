@@ -47,6 +47,7 @@ async function init() {
     console.log('Database initialized successfully.');
   } catch (error) {
     console.error('Database initialization failed:', error);
+    throw error;
   } finally {
     client.release();
     await pool.end();
