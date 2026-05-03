@@ -17,6 +17,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/server.js ./server.js
+COPY --from=builder /app/init-db.js ./init-db.js
 
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "node init-db.js && node server.js"]
