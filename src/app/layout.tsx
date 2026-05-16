@@ -3,17 +3,31 @@ import "./globals.css";
 import Link from "next/link";
 import { LayoutDashboard, PenTool, Vote, Settings, ShieldCheck } from "lucide-react";
 import BingoNotifier from "@/components/BingoNotifier";
+import AnnouncementBar from "@/components/AnnouncementBar";
+import { query } from "@/lib/db";
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: "Büro-Bingo",
   description: "Das vernetzte Bingo-Erlebnis für den Arbeitsplatz.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let announcement = null;
+  try {
+    const res = await query("SELECT value FROM settings WHERE key = 'announcement'");
+    if (res.rows && res.rows.length > 0) {
+      announcement = typeof res.rows[0].value === 'string' ? JSON.parse(res.rows[0].value) : res.rows[0].value;
+    }
+  } catch (err) {
+    console.error("Failed to load announcement:", err);
+  }
+
   return (
     <html lang="de">
       <body>
@@ -44,6 +58,7 @@ export default function RootLayout({
             </Link>
           </div>
         </nav>
+        {announcement && announcement.active && <AnnouncementBar announcement={announcement} />}
         <main className="container animate-fade">
           {children}
         </main>

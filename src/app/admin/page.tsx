@@ -28,6 +28,16 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'entries' | 'departments'>('entries');
   const [newDeptName, setNewDeptName] = useState('');
 
+  // Announcement state
+  const [showAnnounceModal, setShowAnnounceModal] = useState(false);
+  const [announceData, setAnnounceData] = useState({
+    active: false,
+    color: '#3b82f6',
+    headline: '',
+    emoji: '',
+    infoText: ''
+  });
+
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
@@ -55,6 +65,13 @@ export default function AdminPage() {
       const settingsData = await resSettings.json();
       const autoApprove = settingsData.find((s: any) => s.key === 'auto_approve_threshold');
       if (autoApprove) setThreshold(autoApprove.value);
+
+      const announcementSetting = settingsData.find((s: any) => s.key === 'announcement');
+      if (announcementSetting) {
+        const parsed = typeof announcementSetting.value === 'string' ? JSON.parse(announcementSetting.value) : announcementSetting.value;
+        setAnnounceData(parsed);
+      }
+
       setIsAuthorized(true);
       setError('');
     } else {
@@ -98,6 +115,12 @@ export default function AdminPage() {
     alert('Gespeichert');
   };
 
+  const saveAnnouncement = async () => {
+    await adminFetch('update_settings', { settingsKey: 'announcement', settingsValue: announceData });
+    setShowAnnounceModal(false);
+    alert('Ankündigung gespeichert');
+  };
+
   const addDepartment = async () => {
     if (!newDeptName.trim()) return;
     await adminFetch('add_department', { departmentName: newDeptName.trim() });
@@ -138,7 +161,10 @@ export default function AdminPage() {
     <div style={{ maxWidth: '1100px', margin: '2rem auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h1>Admin Dashboard</h1>
-        <button className="btn" onClick={() => setIsAuthorized(false)} style={{ background: 'var(--bg-card)' }}>Logout</button>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button className="btn" onClick={() => setShowAnnounceModal(true)} style={{ background: 'var(--accent)' }}>Ankündigung</button>
+          <button className="btn" onClick={() => setIsAuthorized(false)} style={{ background: 'var(--bg-card)' }}>Logout</button>
+        </div>
       </div>
 
       {/* Settings */}
@@ -329,6 +355,46 @@ export default function AdminPage() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Announcement Modal */}
+      {showAnnounceModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem'
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: '400px', margin: 0 }}>
+            <h2 style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              Ankündigung
+              <button onClick={() => setShowAnnounceModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0 }}><X size={24} /></button>
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                <input type="checkbox" checked={announceData.active} onChange={e => setAnnounceData({...announceData, active: e.target.checked})} style={{ margin: 0 }} />
+                Aktivieren
+              </label>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>Farbe</label>
+                <input type="color" value={announceData.color} onChange={e => setAnnounceData({...announceData, color: e.target.value})} style={{ width: '100%', height: '40px', padding: '0', cursor: 'pointer', border: '1px solid var(--border)', borderRadius: '8px' }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>Emoji</label>
+                <input type="text" value={announceData.emoji} onChange={e => setAnnounceData({...announceData, emoji: e.target.value})} placeholder="🚀" style={{ marginBottom: 0 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>Überschrift (Fett)</label>
+                <input type="text" value={announceData.headline} onChange={e => setAnnounceData({...announceData, headline: e.target.value})} placeholder="Wichtige Info" style={{ marginBottom: 0 }} />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.3rem' }}>Info Text</label>
+                <textarea rows={3} value={announceData.infoText} onChange={e => setAnnounceData({...announceData, infoText: e.target.value})} placeholder="Details zur Ankündigung..." style={{ width: '100%', resize: 'vertical', marginBottom: 0 }} />
+              </div>
+            </div>
+            <button className="btn" onClick={saveAnnouncement} style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}>
+              <Save size={18} /> Speichern
+            </button>
+          </div>
         </div>
       )}
     </div>
